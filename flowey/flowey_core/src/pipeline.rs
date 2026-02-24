@@ -74,6 +74,8 @@ fn linux_distro() -> FlowPlatformLinuxDistro {
     if let Ok(etc_os_release) = fs_err::read_to_string("/etc/os-release") {
         if etc_os_release.contains("ID=ubuntu") {
             FlowPlatformLinuxDistro::Ubuntu
+        } else if etc_os_release.contains("ID=debian") {
+            FlowPlatformLinuxDistro::Ubuntu
         } else if etc_os_release.contains("ID=fedora") {
             FlowPlatformLinuxDistro::Fedora
         } else if etc_os_release.contains("ID=azurelinux") || etc_os_release.contains("ID=mariner")

@@ -3340,6 +3340,7 @@ dependencies = [
  "thiserror 2.0.16",
  "tracelimit",
  "tracing",
+ "x86defs",
  "zerocopy",
 ]
 
@@ -3359,6 +3360,7 @@ dependencies = [
  "bitfield-struct 0.11.0",
  "open_enum",
  "static_assertions",
+ "x86defs",
  "zerocopy",
 ]
 
@@ -9239,6 +9241,7 @@ dependencies = [
  "safe_intrinsics",
  "safeatomic",
  "sidecar_client",
+ "tdx_guest_device",
  "thiserror 2.0.16",
  "tracelimit",
  "tracing",
@@ -10466,6 +10469,7 @@ dependencies = [
  "guid",
  "hcl",
  "inspect",
+ "memory_range",
  "mesh",
  "openhcl_tdisp",
  "pal_async",
@@ -10484,6 +10488,7 @@ dependencies = [
  "vmcore",
  "vpci",
  "vpci_protocol",
+ "x86defs",
  "zerocopy",
 ]
 

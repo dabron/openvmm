@@ -97,6 +97,7 @@ use x86defs::X64_EFER_NXE;
 use x86defs::X64_EFER_SVME;
 use x86defs::X86X_MSR_EFER;
 use x86defs::apic::X2APIC_MSR_BASE;
+use x86defs::tdx::TDX_REPORT_DATA_SIZE;
 use x86defs::tdx::TdCallResultCode;
 use x86defs::tdx::TdVmCallR10Result;
 use x86defs::tdx::TdxGp;
@@ -130,6 +131,7 @@ use x86defs::vmx::VmxExit;
 use x86defs::vmx::VmxExitBasic;
 use x86emu::Gp;
 use x86emu::Segment;
+use zerocopy::IntoBytes;
 
 /// MSRs that are allowed to be read by the guest without interception.
 const MSR_ALLOWED_READ: &[u32] = &[
@@ -3733,6 +3735,8 @@ impl UhHypercallHandler<'_, '_, TdxBacked> {
             hv1_hypercall::HvSendSyntheticClusterIpiEx,
             hv1_hypercall::HvInstallIntercept,
             hv1_hypercall::HvAssertVirtualInterrupt,
+            hv1_hypercall::HvTdxVmCallGetReport,
+            hv1_hypercall::HvTdxVmCallGetSealingKey,
         ]
     );
 
@@ -4470,6 +4474,123 @@ impl hv1_hypercall::FlushVirtualAddressSpaceEx for UhHypercallHandler<'_, '_, Td
 
         // Mark that this VP needs to wait for all TLB locks to be released before returning.
         self.vp.set_wait_for_tlb_locks(vtl);
+
+        Ok(())
+    }
+}
+
+impl hv1_hypercall::TdxVmCallGetReport for UhHypercallHandler<'_, '_, TdxBacked> {
+    fn get_report(
+        &self,
+        partition_id: u64,
+        report_gpa: u64,
+        vmpl: u32,
+        report_data: [u8; TDX_REPORT_DATA_SIZE],
+    ) -> hvdef::HvResult<()> {
+        tracelimit::info_ratelimited!(
+            partition_id,
+            report_gpa,
+            vmpl,
+            "handled get report!!!");
+
+        let tdx = match tdx_guest_device::TdxGuestDevice::open() {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to open /dev/tdx_guest"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        let report = match tdx.get_report(report_data, vmpl) {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to get TD report"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        let guest_memory = &self.vp.partition.gm[self.intercepted_vtl];
+
+        if let Err(err) = guest_memory.write_at(report_gpa, report.as_bytes()) {
+            tracing::warn!(
+                report_gpa,
+                error = &err as &dyn std::error::Error,
+                "failed to write TD report to guest memory"
+            );
+            return hvdef::HvResult::Err(HvError::OperationFailed);
+        }
+
+        Ok(())
+    }
+}
+
+impl hv1_hypercall::TdxVmCallGetKey for UhHypercallHandler<'_, '_, TdxBacked> {
+    fn get_key(
+        &self,
+        partition_id: u64,
+        key_gpa: u64,
+        key_request: [u8; x86defs::tdx::TDX_KEY_REQUEST_SIZE],
+    ) -> hvdef::HvResult<()> {
+        tracelimit::info_ratelimited!(partition_id, key_gpa, "handled get key!!!");
+
+        let tdx = match tdx_guest_device::TdxGuestDevice::open() {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to open /dev/tdx_guest"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        // Call get_report with zeroed report data to obtain current TD
+        // measurements.  These are used to log diagnostic state and to confirm
+        // that the TD is in a valid, measurable state before proceeding with
+        // key derivation.
+        let report = match tdx.get_report([0u8; TDX_REPORT_DATA_SIZE], 0) {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to get TD report for key derivation"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        tracelimit::info_ratelimited!(
+            mr_td = ?report.td_info.td_info_base.mr_td,
+            "TD measurements for get_key"
+        );
+
+        let key = match tdx.get_key(key_request) {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to get sealing key"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        let guest_memory = &self.vp.partition.gm[self.intercepted_vtl];
+
+        if let Err(err) = guest_memory.write_at(key_gpa, &key) {
+            tracing::warn!(
+                key_gpa,
+                error = &err as &dyn std::error::Error,
+                "failed to write sealing key to guest memory"
+            );
+            return hvdef::HvResult::Err(HvError::OperationFailed);
+        }
 
         Ok(())
     }

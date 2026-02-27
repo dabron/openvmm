@@ -60,3 +60,6 @@ build_rs_guest_arch.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+tdx_guest_device.workspace = true

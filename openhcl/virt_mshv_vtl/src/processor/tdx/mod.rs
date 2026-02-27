@@ -130,6 +130,7 @@ use x86defs::vmx::VmxExit;
 use x86defs::vmx::VmxExitBasic;
 use x86emu::Gp;
 use x86emu::Segment;
+use zerocopy::IntoBytes;
 
 /// MSRs that are allowed to be read by the guest without interception.
 const MSR_ALLOWED_READ: &[u32] = &[
@@ -4509,7 +4510,7 @@ impl<T: CpuIo> hv1_hypercall::TdxVmCallGetReport
         partition_id: u64,
         report_gpa: u64,
         vmpl: u32,
-        _report_data: [u8; hvdef::hypercall::TDX_REPORT_DATA_SIZE],
+        report_data: [u8; hvdef::hypercall::TDX_REPORT_DATA_SIZE],
     ) -> hvdef::HvResult<()> {
         tracelimit::info_ratelimited!(
             partition_id,
@@ -4517,9 +4518,39 @@ impl<T: CpuIo> hv1_hypercall::TdxVmCallGetReport
             vmpl,
             "handled get report!!!");
 
-        let report = x86defs::tdx::TdReport::new_box_zeroed();
-        tdcall_mr_report(&mut MshvVtlTdcall(&self.hcl.mshv_vtl), &report)?;
-        report.as_bytes().copy_to_guest(self.vp.runner, report_gpa, report.as_bytes().len() as u64)?;
+        let tdx = match tdx_guest_device::TdxGuestDevice::open() {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to open /dev/tdx_guest"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        let report = match tdx.get_report(report_data, vmpl) {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to get TD report"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        let guest_memory = &self.vp.partition.gm[self.intercepted_vtl];
+
+        if let Err(err) = guest_memory.write_at(report_gpa, report.as_bytes()) {
+            tracing::warn!(
+                report_gpa,
+                error = &err as &dyn std::error::Error,
+                "failed to write TD report to guest memory"
+            );
+            return hvdef::HvResult::Err(HvError::OperationFailed);
+        }
+
         Ok(())
     }
 }

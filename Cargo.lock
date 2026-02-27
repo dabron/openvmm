@@ -8810,6 +8810,7 @@ dependencies = [
  "safe_intrinsics",
  "safeatomic",
  "sidecar_client",
+ "tdx_guest_device",
  "thiserror 2.0.16",
  "tracelimit",
  "tracing",

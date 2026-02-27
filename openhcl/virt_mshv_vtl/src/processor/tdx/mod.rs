@@ -3752,6 +3752,7 @@ impl<T: CpuIo> UhHypercallHandler<'_, '_, T, TdxBacked> {
             hv1_hypercall::HvSendSyntheticClusterIpiEx,
             hv1_hypercall::HvInstallIntercept,
             hv1_hypercall::HvAssertVirtualInterrupt,
+            hv1_hypercall::HvTdxVmCallGetReport,
         ]
     );
 
@@ -4496,6 +4497,25 @@ impl<T: CpuIo> hv1_hypercall::FlushVirtualAddressSpaceEx
         // Mark that this VP needs to wait for all TLB locks to be released before returning.
         self.vp.set_wait_for_tlb_locks(vtl);
 
+        Ok(())
+    }
+}
+
+impl<T: CpuIo> hv1_hypercall::TdxVmCallGetReport
+    for UhHypercallHandler<'_, '_, T, TdxBacked>
+{
+    fn get_report(
+        &self,
+        partition_id: u64,
+        report_gpa: u64,
+        vmpl: u32,
+        _report_data: [u8; hvdef::hypercall::TDX_REPORT_DATA_SIZE],
+    ) -> hvdef::HvResult<()> {
+        tracelimit::info_ratelimited!(
+            partition_id,
+            report_gpa,
+            vmpl,
+            "handled get report!!!");
         Ok(())
     }
 }

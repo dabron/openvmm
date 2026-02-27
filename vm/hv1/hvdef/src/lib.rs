@@ -330,6 +330,11 @@ open_enum! {
 
         // VBS guest calls.
         HvCallVbsVmCallReport = 0xC001,
+
+        // TDX guest calls.
+        HvCallTdxVmCallGetReport = 0xC101,
+        HvCallTdxVmCallVerifyReport = 0xC102,
+        HvCallTdxVmCallGetSealingKey = 0xC103,
     }
 }
 
@@ -2020,6 +2025,19 @@ pub mod hypercall {
         pub reserved: u32,
         pub reference_time_in_100_ns: u64,
         pub tsc: u64,
+    }
+
+    pub const TDX_REPORT_DATA_SIZE: usize = 64;
+    pub const TDX_MAX_REPORT_SIZE: usize = 2048;
+
+    #[repr(C)]
+    #[derive(Copy, Clone, Debug, IntoBytes, Immutable, KnownLayout, FromBytes)]
+    pub struct TdxVmCallGetReport {
+        pub partition_id: u64,
+        pub report_gpa: u64,
+        pub vmpl: u32,
+        pub reserved: u32,
+        pub report_data: [u8; TDX_REPORT_DATA_SIZE],
     }
 }
 

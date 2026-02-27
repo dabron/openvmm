@@ -1070,3 +1070,36 @@ impl<T: RestorePartitionTime> HypercallDispatch<HvRestorePartitionTime> for T {
         })
     }
 }
+
+/// Implements the `HvTdxVmCallGetReport` hypercall.
+pub trait TdxVmCallGetReport {
+    /// Get TD report.
+    fn get_report(
+        &self,
+        partition_id: u64,
+        report_gpa: u64,
+        vmpl: u32,
+        report_data: [u8; hvdef::hypercall::TDX_REPORT_DATA_SIZE],
+    ) -> HvResult<()>;
+}
+
+/// Defines the `HvTdxVmCallGetReport` hypercall.
+pub type HvTdxVmCallGetReport = SimpleHypercall<
+    defs::TdxVmCallGetReport,
+    (),
+    { HypercallCode::HvCallTdxVmCallGetReport.0 },
+>;
+
+impl<T: TdxVmCallGetReport> HypercallDispatch<HvTdxVmCallGetReport> for T
+{
+    fn dispatch(&mut self, params: HypercallParameters<'_>) -> HypercallOutput {
+        HvTdxVmCallGetReport::run(params, |input| {
+            self.get_report(
+                input.partition_id,
+                input.report_gpa,
+                input.vmpl,
+                input.report_data,
+            )
+        })
+    }
+}

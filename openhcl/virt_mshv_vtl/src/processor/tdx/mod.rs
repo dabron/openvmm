@@ -4516,6 +4516,10 @@ impl<T: CpuIo> hv1_hypercall::TdxVmCallGetReport
             report_gpa,
             vmpl,
             "handled get report!!!");
+
+        let report = x86defs::tdx::TdReport::new_box_zeroed();
+        tdcall_mr_report(&mut MshvVtlTdcall(&self.hcl.mshv_vtl), &report)?;
+        report.as_bytes().copy_to_guest(self.vp.runner, report_gpa, report.as_bytes().len() as u64)?;
         Ok(())
     }
 }

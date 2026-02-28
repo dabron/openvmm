@@ -25,6 +25,7 @@ use hvdef::hypercall::HostVisibilityType;
 use hvdef::hypercall::HvRegisterAssoc;
 use hvdef::hypercall::HypercallOutput;
 use hvdef::hypercall::VtlPermissionSet;
+use x86defs::tdx::TDX_REPORT_DATA_SIZE;
 use zerocopy::IntoBytes;
 
 /// Implements the `HvPostMessage` hypercall.
@@ -1079,7 +1080,7 @@ pub trait TdxVmCallGetReport {
         partition_id: u64,
         report_gpa: u64,
         vmpl: u32,
-        report_data: [u8; hvdef::hypercall::TDX_REPORT_DATA_SIZE],
+        report_data: [u8; TDX_REPORT_DATA_SIZE],
     ) -> HvResult<()>;
 }
 

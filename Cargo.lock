@@ -3117,6 +3117,7 @@ dependencies = [
  "thiserror 2.0.16",
  "tracelimit",
  "tracing",
+ "x86defs",
  "zerocopy 0.8.27",
 ]
 
@@ -3136,6 +3137,7 @@ dependencies = [
  "bitfield-struct 0.11.0",
  "open_enum",
  "static_assertions",
+ "x86defs",
  "zerocopy 0.8.27",
 ]
 

@@ -2027,7 +2027,6 @@ pub mod hypercall {
         pub tsc: u64,
     }
 
-    pub const TDX_REPORT_DATA_SIZE: usize = 64;
     pub const TDX_MAX_REPORT_SIZE: usize = 2048;
 
     #[repr(C)]
@@ -2037,7 +2036,7 @@ pub mod hypercall {
         pub report_gpa: u64,
         pub vmpl: u32,
         pub reserved: u32,
-        pub report_data: [u8; TDX_REPORT_DATA_SIZE],
+        pub report_data: [u8; x86defs::tdx::TDX_REPORT_DATA_SIZE],
     }
 }
 

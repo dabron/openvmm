@@ -96,6 +96,7 @@ use x86defs::X64_EFER_NXE;
 use x86defs::X64_EFER_SVME;
 use x86defs::X86X_MSR_EFER;
 use x86defs::apic::X2APIC_MSR_BASE;
+use x86defs::tdx::TDX_REPORT_DATA_SIZE;
 use x86defs::tdx::TdCallResultCode;
 use x86defs::tdx::TdVmCallR10Result;
 use x86defs::tdx::TdxGp;
@@ -4510,7 +4511,7 @@ impl<T: CpuIo> hv1_hypercall::TdxVmCallGetReport
         partition_id: u64,
         report_gpa: u64,
         vmpl: u32,
-        report_data: [u8; hvdef::hypercall::TDX_REPORT_DATA_SIZE],
+        report_data: [u8; TDX_REPORT_DATA_SIZE],
     ) -> hvdef::HvResult<()> {
         tracelimit::info_ratelimited!(
             partition_id,

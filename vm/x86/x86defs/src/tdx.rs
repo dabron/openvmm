@@ -21,6 +21,12 @@ pub const TDX_REPORT_SIZE: usize = 0x400;
 /// Size of `report_data` member in [`ReportMac`].
 pub const TDX_REPORT_DATA_SIZE: usize = 64;
 
+/// Size of the [`TdKeyRequest`].
+pub const TDX_KEY_REQUEST_SIZE: usize = 128;
+
+/// Size of the key.
+pub const TDX_KEY_SIZE: usize = 32;
+
 open_enum! {
     /// TDCALL instruction leafs that are passed into the tdcall instruction
     /// in eax.
@@ -655,6 +661,21 @@ pub struct TdReport {
 }
 
 static_assertions::const_assert_eq!(TDX_REPORT_SIZE, size_of::<TdReport>());
+
+/// Key request structure passed to the TDX module for sealing key derivation.
+///
+/// This opaque 128-byte structure is populated by the caller according to the
+/// `TDKEY_REQUEST` format defined in the "Intel TDX Module v1.5 ABI
+/// specification".  The TDX module uses it to select which TD measurements and
+/// attributes participate in key derivation.
+#[repr(C)]
+#[derive(IntoBytes, Immutable, KnownLayout, FromBytes)]
+pub struct TdKeyRequest {
+    /// Raw key-request bytes as defined by the Intel TDX ABI.
+    pub data: [u8; TDX_KEY_REQUEST_SIZE],
+}
+
+static_assertions::const_assert_eq!(TDX_KEY_REQUEST_SIZE, size_of::<TdKeyRequest>());
 
 /// See `REPORTMACSTRUCT` in Table 3.31, "Intel TDX Module v1.5 ABI specification", March 2024.
 #[repr(C)]

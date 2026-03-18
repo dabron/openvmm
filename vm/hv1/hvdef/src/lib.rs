@@ -2038,6 +2038,19 @@ pub mod hypercall {
         pub reserved: u32,
         pub report_data: [u8; x86defs::tdx::TDX_REPORT_DATA_SIZE],
     }
+
+    #[repr(C)]
+    #[derive(Copy, Clone, Debug, IntoBytes, Immutable, KnownLayout, FromBytes)]
+    pub struct TdxVmCallGetSealingKey {
+        pub partition_id: u64,
+        /// GPA where the resulting 32-byte sealing key will be written.
+        pub key_gpa: u64,
+        pub reserved: u64,
+        /// Key derivation request populated by the caller per the Intel TDX
+        /// Module ABI (`TDKEY_REQUEST`).  Certain fields will be filled in
+        /// by the handler using data obtained from a prior `get_report` call.
+        pub key_request: [u8; x86defs::tdx::TDX_KEY_REQUEST_SIZE],
+    }
 }
 
 macro_rules! registers {

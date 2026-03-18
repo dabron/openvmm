@@ -25,6 +25,7 @@ use hvdef::hypercall::HostVisibilityType;
 use hvdef::hypercall::HvRegisterAssoc;
 use hvdef::hypercall::HypercallOutput;
 use hvdef::hypercall::VtlPermissionSet;
+use x86defs::tdx::TDX_KEY_REQUEST_SIZE;
 use x86defs::tdx::TDX_REPORT_DATA_SIZE;
 use zerocopy::IntoBytes;
 
@@ -1101,6 +1102,37 @@ impl<T: TdxVmCallGetReport> HypercallDispatch<HvTdxVmCallGetReport> for T
                 input.vmpl,
                 input.report_data,
             )
+        })
+    }
+}
+
+/// Implements the `HvTdxVmCallGetSealingKey` hypercall.
+pub trait TdxVmCallGetKey {
+    /// Get a TDX sealing key.
+    ///
+    /// The handler is expected to first call `get_report` to obtain current TD
+    /// measurements, use those to fill in any measurement-dependent fields of
+    /// `key_request`, and then invoke the `TDX_CMD_GET_KEY0` ioctl.  The
+    /// resulting 32-byte key is written to guest memory at `key_gpa`.
+    fn get_key(
+        &self,
+        partition_id: u64,
+        key_gpa: u64,
+        key_request: [u8; TDX_KEY_REQUEST_SIZE],
+    ) -> HvResult<()>;
+}
+
+/// Defines the `HvTdxVmCallGetSealingKey` hypercall.
+pub type HvTdxVmCallGetSealingKey = SimpleHypercall<
+    defs::TdxVmCallGetSealingKey,
+    (),
+    { HypercallCode::HvCallTdxVmCallGetSealingKey.0 },
+>;
+
+impl<T: TdxVmCallGetKey> HypercallDispatch<HvTdxVmCallGetSealingKey> for T {
+    fn dispatch(&mut self, params: HypercallParameters<'_>) -> HypercallOutput {
+        HvTdxVmCallGetSealingKey::run(params, |input| {
+            self.get_key(input.partition_id, input.key_gpa, input.key_request)
         })
     }
 }

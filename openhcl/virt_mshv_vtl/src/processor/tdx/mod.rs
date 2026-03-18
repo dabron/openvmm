@@ -3755,6 +3755,7 @@ impl<T: CpuIo> UhHypercallHandler<'_, '_, T, TdxBacked> {
             hv1_hypercall::HvInstallIntercept,
             hv1_hypercall::HvAssertVirtualInterrupt,
             hv1_hypercall::HvTdxVmCallGetReport,
+            hv1_hypercall::HvTdxVmCallGetSealingKey,
         ]
     );
 
@@ -4548,6 +4549,83 @@ impl<T: CpuIo> hv1_hypercall::TdxVmCallGetReport
                 report_gpa,
                 error = &err as &dyn std::error::Error,
                 "failed to write TD report to guest memory"
+            );
+            return hvdef::HvResult::Err(HvError::OperationFailed);
+        }
+
+        Ok(())
+    }
+}
+
+impl<T: CpuIo> hv1_hypercall::TdxVmCallGetKey
+    for UhHypercallHandler<'_, '_, T, TdxBacked>
+{
+    fn get_key(
+        &self,
+        partition_id: u64,
+        key_gpa: u64,
+        key_request: [u8; x86defs::tdx::TDX_KEY_REQUEST_SIZE],
+    ) -> hvdef::HvResult<()> {
+        tracelimit::info_ratelimited!(partition_id, key_gpa, "handled get key!!!");
+
+        let tdx = match tdx_guest_device::TdxGuestDevice::open() {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to open /dev/tdx_guest"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        // Call get_report with zeroed report data to obtain current TD
+        // measurements.  These are used to log diagnostic state and to confirm
+        // that the TD is in a valid, measurable state before proceeding with
+        // key derivation.
+        let report = match tdx.get_report([0u8; TDX_REPORT_DATA_SIZE], 0) {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to get TD report for key derivation"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        // Build the key request from the caller-supplied bytes.  The
+        // TDKEY_REQUEST structure's KeyFieldSelect and policy fields (bytes
+        // 0–127) are owned by the caller; the report above is used only to
+        // confirm valid TD state and to supply identity measurements for
+        // tracing purposes.
+        let td_key_request = x86defs::tdx::TdKeyRequest {
+            data: key_request,
+        };
+
+        tracelimit::info_ratelimited!(
+            mr_td = ?report.td_info.td_info_base.mr_td,
+            "TD measurements for get_key"
+        );
+
+        let key = match tdx.get_key(td_key_request) {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(
+                    error = &err as &dyn std::error::Error,
+                    "failed to get sealing key"
+                );
+                return hvdef::HvResult::Err(HvError::OperationFailed);
+            }
+        };
+
+        let guest_memory = &self.vp.partition.gm[self.intercepted_vtl];
+
+        if let Err(err) = guest_memory.write_at(key_gpa, &key) {
+            tracing::warn!(
+                key_gpa,
+                error = &err as &dyn std::error::Error,
+                "failed to write sealing key to guest memory"
             );
             return hvdef::HvResult::Err(HvError::OperationFailed);
         }

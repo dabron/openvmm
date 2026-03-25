@@ -23,6 +23,7 @@ use crate::UhPartitionInner;
 use crate::UhPartitionNewParams;
 use crate::UhProcessor;
 use crate::WakeReason;
+use crate::devmsr::MsrDevice;
 use crate::get_tsc_frequency;
 use cvm_tracing::CVM_ALLOWED;
 use cvm_tracing::CVM_CONFIDENTIAL;
@@ -51,6 +52,7 @@ use hvdef::hypercall::HvGvaRange;
 use inspect::Inspect;
 use inspect::InspectMut;
 use inspect_counters::Counter;
+use safe_intrinsics::cpuid;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
 use thiserror::Error;
@@ -95,7 +97,9 @@ use x86defs::X64_EFER_LME;
 use x86defs::X64_EFER_NXE;
 use x86defs::X64_EFER_SVME;
 use x86defs::X86X_MSR_EFER;
+use x86defs::X86X_MSR_VMX_PROCBASED_CTLS3;
 use x86defs::apic::X2APIC_MSR_BASE;
+use x86defs::cpuid::VersionAndFeaturesEcx;
 use x86defs::tdx::TdCallResultCode;
 use x86defs::tdx::TdVmCallR10Result;
 use x86defs::tdx::TdxGp;
@@ -122,6 +126,7 @@ use x86defs::vmx::LdtrOrTrInstruction;
 use x86defs::vmx::LdtrOrTrInstructionInfo;
 use x86defs::vmx::ProcessorControls;
 use x86defs::vmx::SecondaryProcessorControls;
+use x86defs::vmx::TertiaryProcessorControls;
 use x86defs::vmx::VMX_ENTRY_CONTROL_LONG_MODE_GUEST;
 use x86defs::vmx::VMX_FEATURE_CONTROL_LOCKED;
 use x86defs::vmx::VmcsField;
@@ -160,6 +165,24 @@ const MSR_ALLOWED_READ_WRITE: &[u32] = &[
     x86defs::X86X_IA32_MSR_XFD,
     x86defs::X86X_IA32_MSR_XFD_ERR,
 ];
+
+fn supports_ipi_virtualization() -> bool {
+    let features = VersionAndFeaturesEcx::from(
+        cpuid(x86defs::cpuid::CpuidFunction::VersionAndFeatures.0, 0).ecx,
+    );
+    if !features.vmx() {
+        return false;
+    }
+
+    // For VMX capability MSRs, the upper 32 bits are the allowed-1 mask.
+    MsrDevice::new(0)
+        .and_then(|msr| msr.read_msr(X86X_MSR_VMX_PROCBASED_CTLS3))
+        .map(|allowed| {
+            let allowed_1 = (allowed >> 32) as u32;
+            TertiaryProcessorControls::from(allowed_1 as u64).ipi_virtualization()
+        })
+        .unwrap_or(false)
+}
 
 #[derive(Debug, Error)]
 #[error("unknown exit {0:#x?}")]
@@ -1026,6 +1049,32 @@ impl BackingPrivate for TdxBacked {
         // TODO TDX: lapic / APIC setup?
         // TODO TDX: see ValInitializeVplc
         // TODO TDX: XCR_XFMEM setup?
+
+        let enable_ipi_virtualization = supports_ipi_virtualization();
+
+        params.runner.write_vmcs32(
+            GuestVtl::Vtl0,
+            VmcsField::VMX_VMCS_PROCESSOR_CONTROLS,
+            ProcessorControls::new()
+                .with_activate_tertiary_controls(true)
+                .into(),
+            ProcessorControls::new()
+                .with_activate_tertiary_controls(enable_ipi_virtualization)
+                .into(),
+        );
+
+        if enable_ipi_virtualization {
+            params.runner.write_vmcs64(
+                GuestVtl::Vtl0,
+                VmcsField::VMX_VMCS_TERTIARY_PROCESSOR_CONTROLS,
+                TertiaryProcessorControls::new()
+                    .with_ipi_virtualization(true)
+                    .into(),
+                TertiaryProcessorControls::new()
+                    .with_ipi_virtualization(true)
+                    .into(),
+            );
+        }
 
         // Turn on MBEC for just VTL 0.
         params.runner.write_vmcs32(
@@ -2494,11 +2543,16 @@ impl UhProcessor<'_, TdxBacked> {
             self.runner
                 .read_vmcs32(vtl, VmcsField::VMX_VMCS_SECONDARY_PROCESSOR_CONTROLS),
         );
+        let vmcs_tertiary_processor_controls = TertiaryProcessorControls::from(
+            self.runner
+                .read_vmcs64(vtl, VmcsField::VMX_VMCS_TERTIARY_PROCESSOR_CONTROLS),
+        );
         tracing::error!(
             CVM_CONFIDENTIAL,
             ?cached_processor_controls,
             ?vmcs_processor_controls,
             ?vmcs_secondary_processor_controls,
+            ?vmcs_tertiary_processor_controls,
             "processor controls"
         );
 

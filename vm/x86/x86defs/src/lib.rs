@@ -229,6 +229,7 @@ pub const X86X_MSR_MTRR_FIX4K_F0000: u32 = 0x026E;
 pub const X86X_MSR_MTRR_FIX4K_F8000: u32 = 0x026F;
 pub const X86X_MSR_CR_PAT: u32 = 0x277;
 pub const X86X_MSR_MTRR_DEF_TYPE: u32 = 0x2ff;
+pub const X86X_MSR_VMX_PROCBASED_CTLS3: u32 = 0x492;
 
 pub const X86X_MSR_XSS: u32 = 0xda0;
 

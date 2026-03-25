@@ -186,6 +186,7 @@ impl VmcsField {
     pub const VMX_VMCS_ENTRY_INSTRUCTION_LENGTH: Self = Self(0x0000401A);
     pub const VMX_VMCS_TPR_THRESHOLD: Self = Self(0x0000401C);
     pub const VMX_VMCS_SECONDARY_PROCESSOR_CONTROLS: Self = Self(0x0000401E);
+    pub const VMX_VMCS_TERTIARY_PROCESSOR_CONTROLS: Self = Self(0x00002034);
 
     pub const VMX_VMCS_CR0_GUEST_HOST_MASK: Self = Self(0x00006000);
     pub const VMX_VMCS_CR4_GUEST_HOST_MASK: Self = Self(0x00006002);
@@ -495,6 +496,22 @@ pub struct SecondaryProcessorControls {
     _reserved: bool,
     pub vmm_bus_lock_detection: bool,
     pub instruction_timeout: bool,
+}
+
+#[bitfield(u64)]
+pub struct TertiaryProcessorControls {
+    pub loadiwkey_exiting: bool,
+    pub enable_hlat: bool,
+    pub ept_paging_write_control: bool,
+    pub guest_paging_verification: bool,
+    pub ipi_virtualization: bool,
+    pub seam_guest_pysical_address_width: bool,
+    pub enable_msr_list_instructions: bool,
+    pub virtualize_ia32_spec_ctrl: bool,
+    _reserved: bool,
+    pub enable_pbndkb: bool,
+    #[bits(54)]
+    _reserved2: u64,
 }
 
 #[repr(C)]

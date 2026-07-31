@@ -4594,21 +4594,12 @@ impl<T: CpuIo> hv1_hypercall::TdxVmCallGetKey
             }
         };
 
-        // Build the key request from the caller-supplied bytes.  The
-        // TDKEY_REQUEST structure's KeyFieldSelect and policy fields (bytes
-        // 0–127) are owned by the caller; the report above is used only to
-        // confirm valid TD state and to supply identity measurements for
-        // tracing purposes.
-        let td_key_request = x86defs::tdx::TdKeyRequest {
-            data: key_request,
-        };
-
         tracelimit::info_ratelimited!(
             mr_td = ?report.td_info.td_info_base.mr_td,
             "TD measurements for get_key"
         );
 
-        let key = match tdx.get_key(td_key_request) {
+        let key = match tdx.get_key(key_request) {
             Ok(v) => v,
             Err(err) => {
                 tracing::warn!(

@@ -62,8 +62,8 @@ struct TdxKeyReq {
 nix::ioctl_readwrite!(
     /// `TDX_CMD_GET_KEY0` ioctl defined by Linux.
     tdx_get_key0,
-    TDX_CMD_GET_KEY0_IOC_TYPE,
-    0x1,
+    TDX_CMD_GET_REPORT0_IOC_TYPE,
+    0x2,
     TdxKeyReq
 );
 
@@ -101,9 +101,9 @@ impl TdxGuestDevice {
     }
 
     /// Invoke the `TDX_CMD_GET_KEY0` ioctl via the device.
-    pub fn get_key(&self, key_request: TdKeyRequest) -> Result<[u8; TDX_KEY_SIZE], Error> {
+    pub fn get_key(&self, key_request: [u8; TDX_KEY_REQUEST_SIZE]) -> Result<[u8; TDX_KEY_SIZE], Error> {
         let mut tdx_key_request = TdxKeyReq {
-            key_request: key_request.data,
+            key_request,
             key: [0u8; TDX_KEY_SIZE],
         };
 

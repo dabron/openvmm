@@ -12,7 +12,6 @@ use thiserror::Error;
 use x86defs::tdx::TDX_KEY_REQUEST_SIZE;
 use x86defs::tdx::TDX_KEY_SIZE;
 use x86defs::tdx::TDX_REPORT_DATA_SIZE;
-use x86defs::tdx::TdKeyRequest;
 use x86defs::tdx::TdReport;
 use zerocopy::FromZeros;
 

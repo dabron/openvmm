@@ -1,0 +1,1 @@
+cargo build && cargo xflowey build-igvm x64-cvm --install-missing-deps --custom-kernel ./kernel/vmlinux --custom-kernel-modules ./kernel/modules && cp ./flowey-out/artifacts/build-igvm/debug/x64-cvm-custom/openhcl-x64-cvm-custom.bin /mnt/d/tmp

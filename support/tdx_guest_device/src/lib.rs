@@ -62,8 +62,8 @@ struct TdxKeyReq {
 nix::ioctl_readwrite!(
     /// `TDX_CMD_GET_KEY0` ioctl defined by Linux.
     tdx_get_key0,
-    TDX_CMD_GET_REPORT0_IOC_TYPE,
-    0x2,
+    TDX_CMD_GET_KEY0_IOC_TYPE,
+    0x1,
     TdxKeyReq
 );
 
